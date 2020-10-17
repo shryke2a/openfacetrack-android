@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">CameraX App</string>
+    <string name="button_tracking_running">Running</string>
+    <string name="button_tracking_stopped">Stopped</string>
+    <string name="button_tracking_1stRun">Start here</string>
+    <string name="text_display_not_tracking">Not tracking</string>
+    <string name="x_axis_indicator">X axis</string>
+    <string name="y_axis_indicator">Y axis</string>
+    <string name="z_axis_indicator">Z axis</string>
+    <string name="numOfFace">Number of faces</string>
+</resources>
