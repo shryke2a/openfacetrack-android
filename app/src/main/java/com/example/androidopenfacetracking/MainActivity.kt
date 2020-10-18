@@ -12,7 +12,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
@@ -22,22 +21,19 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.android.synthetic.main.activity_main.*
-import java.io.File
-import java.io.IOException
 import java.net.*
 import java.nio.ByteBuffer
-import java.nio.channels.IllegalBlockingModeException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+
 
 typealias LumaListener = (luma: Double) -> Unit
 
 
     class MainActivity : AppCompatActivity() {
-        private var imageCapture: ImageCapture? = null
 
-        private lateinit var outputDirectory: File
         private lateinit var cameraExecutor: ExecutorService
+        private lateinit var networkExecutor: ExecutorService
         private var trackingState = false
 
         //Instance d'analyseur d'image
@@ -46,8 +42,9 @@ typealias LumaListener = (luma: Double) -> Unit
 
         private lateinit var imageAnalysis: ImageAnalysis
 
-        // instance de processing du facetrack
-        // Preparation des options de detections de visage
+        // instance de processing du face track
+        // Face detection options
+        //TODO Test best speed
         private val faceDetectOpts = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
@@ -86,7 +83,6 @@ typealias LumaListener = (luma: Double) -> Unit
             b.text = getString(R.string.button_tracking_running)
 
             //Init UDP socket
-        try {
                 val port: Int = Integer.parseInt(txtPort.text.toString())
                 val ip: InetAddress = InetAddress.getByName(txtAddr.text.toString())
                 val addr: InetSocketAddress = InetSocketAddress(ip, port)
@@ -112,7 +108,13 @@ typealias LumaListener = (luma: Double) -> Unit
                                         yaw_axis_display.text = face.headEulerAngleY.toString()
                                         roll_axis_display.text = face.headEulerAngleZ.toString()
 
+                                        //TODO find out why the array does not compute
+                                        // After test, packages are sent to the target computer but empty.
+
                                         var buf: ByteBuffer = ByteBuffer.allocate(Double.SIZE_BYTES * 6)
+
+                                        Log.e(TAG, "Buffer before alloc $buf")
+
                                         buf.putDouble(0.0) //X
                                         buf.putDouble(0.0) //Y
                                         buf.putDouble(0.0) //Z
@@ -120,16 +122,20 @@ typealias LumaListener = (luma: Double) -> Unit
                                         buf.putDouble(face.headEulerAngleY.toDouble()) //Pitch
                                         buf.putDouble(face.headEulerAngleZ.toDouble()) //Roll
 
-                                        val array = buf.array()
+                                        Log.e(TAG, "Buffer after alloc $buf")
 
-                                        val d: DatagramPacket = DatagramPacket(
-                                            array,
-array.size,
-                                            addr
-                                        )
-                                        //TODO fix send method
-                                        // udpSocket.send(d)
-                                        Log.e(TAG, "Message to be sent: $d")
+                                        val array = buf.array()
+                                        val d: DatagramPacket = DatagramPacket(array, array.size, addr)
+
+                                        //TODO Check efficiency: maybe faster way
+                                        networkExecutor = Executors.newSingleThreadExecutor()
+
+                                        networkExecutor.execute {
+                                            udpSocket.send(d)
+                                            //Log.e(TAG, "data sent : $d")
+                                        }
+
+                                        networkExecutor.shutdown()
                                     }
                                 }
                                 number_of_face.text = iter.toString()
@@ -149,17 +155,18 @@ array.size,
                         )
                     }
                 })
-            }
-            catch(e: SocketException){
-                Log.e(TAG, "Socket went wrong $e")
-            }
+
+
         }
 
         else {
             imageAnalysis.clearAnalyzer()
             b.text = getString(R.string.button_tracking_stopped)
         }
+    }
 
+    suspend fun sendTrackingData(socket: DatagramSocket, trackDatagramm :DatagramPacket){
+        socket.send(trackDatagramm)
     }
 
     private fun startCamera() {
