@@ -12,7 +12,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
@@ -22,22 +21,21 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.android.synthetic.main.activity_main.*
-import java.io.File
-import java.io.IOException
 import java.net.*
 import java.nio.ByteBuffer
-import java.nio.channels.IllegalBlockingModeException
+import java.nio.ByteOrder
+import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+
 
 typealias LumaListener = (luma: Double) -> Unit
 
 
     class MainActivity : AppCompatActivity() {
-        private var imageCapture: ImageCapture? = null
 
-        private lateinit var outputDirectory: File
         private lateinit var cameraExecutor: ExecutorService
+        private lateinit var networkExecutor: ExecutorService
         private var trackingState = false
 
         //Instance d'analyseur d'image
@@ -46,8 +44,9 @@ typealias LumaListener = (luma: Double) -> Unit
 
         private lateinit var imageAnalysis: ImageAnalysis
 
-        // instance de processing du facetrack
-        // Preparation des options de detections de visage
+        // instance de processing du face track
+        // Face detection options
+        //TODO Test best speed
         private val faceDetectOpts = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
@@ -86,11 +85,13 @@ typealias LumaListener = (luma: Double) -> Unit
             b.text = getString(R.string.button_tracking_running)
 
             //Init UDP socket
-        try {
                 val port: Int = Integer.parseInt(txtPort.text.toString())
                 val ip: InetAddress = InetAddress.getByName(txtAddr.text.toString())
                 val addr: InetSocketAddress = InetSocketAddress(ip, port)
                 val udpSocket: DatagramSocket = DatagramSocket()
+
+                // Frame counter
+                var frameCount: Long = 0
 
             imageAnalysis.setAnalyzer(
                 ContextCompat.getMainExecutor(this),
@@ -108,31 +109,52 @@ typealias LumaListener = (luma: Double) -> Unit
                                     iter += 1
 
                                     if (iter == 1) {
+                                        frameCount += 1
                                         pitch_axis_display.text = face.headEulerAngleX.toString()
                                         yaw_axis_display.text = face.headEulerAngleY.toString()
                                         roll_axis_display.text = face.headEulerAngleZ.toString()
 
+                                        //TODO find out why the package aren't understood
+                                        // After test, packages are sent to the target computer with the right number of bytes.
+                                        // But opentrack doesn't seem to understand the data.
+
                                         var buf: ByteBuffer = ByteBuffer.allocate(Double.SIZE_BYTES * 6)
+
+                                        buf.order(ByteOrder.LITTLE_ENDIAN)
+
                                         buf.putDouble(0.0) //X
                                         buf.putDouble(0.0) //Y
                                         buf.putDouble(0.0) //Z
-                                        buf.putDouble(face.headEulerAngleX.toDouble()) //Yaw
-                                        buf.putDouble(face.headEulerAngleY.toDouble()) //Pitch
+                                        buf.putDouble(face.headEulerAngleY.toDouble()) //Yaw
+                                        buf.putDouble(face.headEulerAngleX.toDouble()) //Pitch
                                         buf.putDouble(face.headEulerAngleZ.toDouble()) //Roll
 
-                                        val array = buf.array()
+                                        /* buf.putDouble(12.27) //X
+                                        buf.putDouble(9.7) //Y
+                                        buf.putDouble(15.5) //Z
+                                        buf.putDouble(33.4) //Yaw
+                                        buf.putDouble(27.6) //Pitch
+                                        buf.putDouble(22.4) //Roll */
 
-                                        val d: DatagramPacket = DatagramPacket(
-                                            array,
-array.size,
-                                            addr
-                                        )
-                                        //TODO fix send method
-                                        // udpSocket.send(d)
-                                        Log.e(TAG, "Message to be sent: $d")
+                                        //Log.e(TAG, "Buffer after alloc ${Arrays.toString(buf.array())}.")
+
+                                        val d: DatagramPacket = DatagramPacket(buf.array(), buf.array().size, addr)
+
+                                        /* Log.e(TAG, "Angle X detected : ${face.headEulerAngleZ}")
+                                        Log.e(TAG, "Angle X sent : ${ByteBuffer.wrap(d.data).getDouble(40)}") */
+
+                                        //TODO Check efficiency: maybe faster way
+                                        networkExecutor = Executors.newSingleThreadExecutor()
+
+                                        networkExecutor.execute {
+                                            udpSocket.send(d)
+                                            // Log.e(TAG, "data sent : ${Arrays.toString(buf.array())}")
+                                        }
+
+                                        networkExecutor.shutdown()
                                     }
                                 }
-                                number_of_face.text = iter.toString()
+                                number_of_face.text = frameCount.toString()
                                 // Log.e(TAG, faces.toString())
 
                             }
@@ -149,17 +171,18 @@ array.size,
                         )
                     }
                 })
-            }
-            catch(e: SocketException){
-                Log.e(TAG, "Socket went wrong $e")
-            }
+
+
         }
 
         else {
             imageAnalysis.clearAnalyzer()
             b.text = getString(R.string.button_tracking_stopped)
         }
+    }
 
+    suspend fun sendTrackingData(socket: DatagramSocket, trackDatagramm :DatagramPacket){
+        socket.send(trackDatagramm)
     }
 
     private fun startCamera() {
