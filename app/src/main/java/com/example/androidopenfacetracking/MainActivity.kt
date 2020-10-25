@@ -23,6 +23,7 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.android.synthetic.main.activity_main.*
 import java.net.*
 import java.nio.ByteBuffer
+import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -88,6 +89,9 @@ typealias LumaListener = (luma: Double) -> Unit
                 val addr: InetSocketAddress = InetSocketAddress(ip, port)
                 val udpSocket: DatagramSocket = DatagramSocket()
 
+                // Frame counter
+                var frameCount: Long = 0
+
             imageAnalysis.setAnalyzer(
                 ContextCompat.getMainExecutor(this),
                 ImageAnalysis.Analyzer { imageProxy ->
@@ -104,41 +108,48 @@ typealias LumaListener = (luma: Double) -> Unit
                                     iter += 1
 
                                     if (iter == 1) {
+                                        frameCount += 1
                                         pitch_axis_display.text = face.headEulerAngleX.toString()
                                         yaw_axis_display.text = face.headEulerAngleY.toString()
                                         roll_axis_display.text = face.headEulerAngleZ.toString()
 
-                                        //TODO find out why the array does not compute
-                                        // After test, packages are sent to the target computer but empty.
+                                        //TODO find out why the package aren't understood
+                                        // After test, packages are sent to the target computer with the right number of bytes.
+                                        // But opentrack doesn't seem to understand the data.
 
                                         var buf: ByteBuffer = ByteBuffer.allocate(Double.SIZE_BYTES * 6)
 
-                                        Log.e(TAG, "Buffer before alloc $buf")
+                                        //Log.e(TAG, "Buffer before alloc ${Arrays.toString(buf.array())}")
 
                                         buf.putDouble(0.0) //X
                                         buf.putDouble(0.0) //Y
-                                        buf.putDouble(0.0) //Z
+                                        buf.putDouble(15.5) //Z
                                         buf.putDouble(face.headEulerAngleX.toDouble()) //Yaw
                                         buf.putDouble(face.headEulerAngleY.toDouble()) //Pitch
                                         buf.putDouble(face.headEulerAngleZ.toDouble()) //Roll
 
-                                        Log.e(TAG, "Buffer after alloc $buf")
 
-                                        val array = buf.array()
-                                        val d: DatagramPacket = DatagramPacket(array, array.size, addr)
+                                        // buf.putLong(frameCount)
+
+                                        //Log.e(TAG, "Buffer after alloc ${Arrays.toString(buf.array())}.")
+
+                                        val d: DatagramPacket = DatagramPacket(buf.array(), buf.array().size, addr)
+
+                                        Log.e(TAG, "Angle X detected : ${face.headEulerAngleZ}")
+                                        Log.e(TAG, "Angle X sent : ${ByteBuffer.wrap(d.data).getDouble(40)}")
 
                                         //TODO Check efficiency: maybe faster way
                                         networkExecutor = Executors.newSingleThreadExecutor()
 
                                         networkExecutor.execute {
                                             udpSocket.send(d)
-                                            //Log.e(TAG, "data sent : $d")
+                                            Log.e(TAG, "data sent : ${Arrays.toString(buf.array())}")
                                         }
 
                                         networkExecutor.shutdown()
                                     }
                                 }
-                                number_of_face.text = iter.toString()
+                                number_of_face.text = frameCount.toString()
                                 // Log.e(TAG, faces.toString())
 
                             }
