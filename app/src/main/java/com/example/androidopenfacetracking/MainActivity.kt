@@ -23,6 +23,7 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.android.synthetic.main.activity_main.*
 import java.net.*
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -119,31 +120,35 @@ typealias LumaListener = (luma: Double) -> Unit
 
                                         var buf: ByteBuffer = ByteBuffer.allocate(Double.SIZE_BYTES * 6)
 
-                                        //Log.e(TAG, "Buffer before alloc ${Arrays.toString(buf.array())}")
+                                        buf.order(ByteOrder.LITTLE_ENDIAN)
 
                                         buf.putDouble(0.0) //X
                                         buf.putDouble(0.0) //Y
-                                        buf.putDouble(15.5) //Z
-                                        buf.putDouble(face.headEulerAngleX.toDouble()) //Yaw
-                                        buf.putDouble(face.headEulerAngleY.toDouble()) //Pitch
+                                        buf.putDouble(0.0) //Z
+                                        buf.putDouble(face.headEulerAngleY.toDouble()) //Yaw
+                                        buf.putDouble(face.headEulerAngleX.toDouble()) //Pitch
                                         buf.putDouble(face.headEulerAngleZ.toDouble()) //Roll
 
-
-                                        // buf.putLong(frameCount)
+                                        /* buf.putDouble(12.27) //X
+                                        buf.putDouble(9.7) //Y
+                                        buf.putDouble(15.5) //Z
+                                        buf.putDouble(33.4) //Yaw
+                                        buf.putDouble(27.6) //Pitch
+                                        buf.putDouble(22.4) //Roll */
 
                                         //Log.e(TAG, "Buffer after alloc ${Arrays.toString(buf.array())}.")
 
                                         val d: DatagramPacket = DatagramPacket(buf.array(), buf.array().size, addr)
 
-                                        Log.e(TAG, "Angle X detected : ${face.headEulerAngleZ}")
-                                        Log.e(TAG, "Angle X sent : ${ByteBuffer.wrap(d.data).getDouble(40)}")
+                                        /* Log.e(TAG, "Angle X detected : ${face.headEulerAngleZ}")
+                                        Log.e(TAG, "Angle X sent : ${ByteBuffer.wrap(d.data).getDouble(40)}") */
 
                                         //TODO Check efficiency: maybe faster way
                                         networkExecutor = Executors.newSingleThreadExecutor()
 
                                         networkExecutor.execute {
                                             udpSocket.send(d)
-                                            Log.e(TAG, "data sent : ${Arrays.toString(buf.array())}")
+                                            // Log.e(TAG, "data sent : ${Arrays.toString(buf.array())}")
                                         }
 
                                         networkExecutor.shutdown()
