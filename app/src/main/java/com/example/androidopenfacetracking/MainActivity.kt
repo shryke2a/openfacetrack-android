@@ -92,8 +92,8 @@ typealias LumaListener = (luma: Double) -> Unit
                     val net: netWork = netWork(udpSocket, addr)
                     // Frame counter
                     var frameCount: Int = 0
-
-                imageAnalysis.setAnalyzer(
+            // The analyzer
+            imageAnalysis.setAnalyzer(
                     camExecutor,
                     ImageAnalysis.Analyzer { imageProxy ->
                         val rotationDegrees = imageProxy.imageInfo.rotationDegrees
@@ -112,42 +112,33 @@ typealias LumaListener = (luma: Double) -> Unit
 
                                             frameCount += 1
 
+                                            //Showing the data
                                             pitch_axis_display.text = face.headEulerAngleX.toString()
                                             yaw_axis_display.text = face.headEulerAngleY.toString()
                                             roll_axis_display.text = face.headEulerAngleZ.toString()
 
+                                            // Calling the network on another thread
                                             networkExecutor.execute {
                                                 net.calcAndSend(face.headEulerAngleY.toDouble(), face.headEulerAngleX.toDouble(), face.headEulerAngleZ.toDouble(), face.boundingBox)
-                                                Log.e(TAG, face.boundingBox.toString())
                                             }
                                         }
                                     }
                                     number_of_face.text = frameCount.toString()
-                                    // Log.e(TAG, faces.toString())
-
+                                }
+                                .addOnFailureListener {
+                                    number_of_face.text = "0"
                                 }
                                 .addOnCompleteListener {
                                     imageProxy.close()
                                 }
-                        } catch (e: MlKitException) {
-                            Log.e(
-                                TAG,
-                                "Failed to process image. Error: " + e.localizedMessage
-                            )
-                        }
+                        } catch (e: MlKitException) {  }
                     })
-
-
         }
 
         else {
             imageAnalysis.clearAnalyzer()
             b.text = getString(R.string.button_tracking_stopped)
         }
-    }
-
-    suspend fun sendTrackingData(socket: DatagramSocket, trackDatagramm :DatagramPacket){
-        socket.send(trackDatagramm)
     }
 
     private fun startCamera() {
@@ -198,7 +189,6 @@ typealias LumaListener = (luma: Double) -> Unit
 
     companion object {
         private const val TAG = "CameraXBasic"
-        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
     }
