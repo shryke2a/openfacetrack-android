@@ -4,6 +4,10 @@ App destined to emulate what Smoothtrack is doing, using APIs that are available
 
 Currently not feature-finished : rotation works, position doesn't.
 
+# Version  
+
+You can find the releases here : https://github.com/shryke2a/android-open-face-tracking/releases
+
 # Setting up
 
 1. Run Opentrack on the computer where you play.
@@ -11,7 +15,7 @@ Currently not feature-finished : rotation works, position doesn't.
 3. Set up filter Accela, with 2.5° smoothing on rotation and position (position does not work yet).
 3.5. Set up "YAW" as inverted in Opentrack options/ Output.
 4. Find out your IPv4 LAN adress, through the use of "ipconfig" command in windows prompt.
-4. Open the app on your phone.
+4. Install and open the app on your phone.
 5. Set up the app with the correct IP and correct port. Verify that you are connected to your WiFi, same LAN as your gaming computer.
 6. Put the phone in the position where it will track your face.
 7. Press the button under the camera to start tracking.
